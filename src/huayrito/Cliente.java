@@ -18,7 +18,6 @@ public class Cliente extends javax.swing.JFrame {
         jLabel3 = new javax.swing.JLabel();
         btnReservas = new javax.swing.JButton();
         btnProductos = new javax.swing.JButton();
-        btnInventario = new javax.swing.JButton();
         btnFinanciera = new javax.swing.JButton();
         btnCliente = new javax.swing.JButton();
         btnPedidos = new javax.swing.JButton();
@@ -81,16 +80,7 @@ public class Cliente extends javax.swing.JFrame {
                 btnProductosActionPerformed(evt);
             }
         });
-        jPanel3.add(btnProductos, new org.netbeans.lib.awtextra.AbsoluteConstraints(40, 210, 240, 50));
-
-        btnInventario.setFont(new java.awt.Font("Segoe UI", 1, 24)); // NOI18N
-        btnInventario.setText("INVENTARIO");
-        btnInventario.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnInventarioActionPerformed(evt);
-            }
-        });
-        jPanel3.add(btnInventario, new org.netbeans.lib.awtextra.AbsoluteConstraints(40, 290, 240, 50));
+        jPanel3.add(btnProductos, new org.netbeans.lib.awtextra.AbsoluteConstraints(40, 290, 240, 50));
 
         btnFinanciera.setFont(new java.awt.Font("Segoe UI", 1, 24)); // NOI18N
         btnFinanciera.setText("FINANCIERA");
@@ -234,13 +224,6 @@ public class Cliente extends javax.swing.JFrame {
         this.dispose();
     }//GEN-LAST:event_btnProductosActionPerformed
 
-    private void btnInventarioActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnInventarioActionPerformed
-        Inventario p1 = new Inventario();
-        p1.setVisible(true);
-        p1.setLocationRelativeTo(null);
-        this.dispose();
-    }//GEN-LAST:event_btnInventarioActionPerformed
-
     private void btnFinancieraActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnFinancieraActionPerformed
         Financiera p1 = new Financiera();
         p1.setVisible(true);
@@ -276,7 +259,6 @@ public class Cliente extends javax.swing.JFrame {
     private javax.swing.JButton btnEliminar;
     private javax.swing.JButton btnEmpleados;
     private javax.swing.JButton btnFinanciera;
-    private javax.swing.JButton btnInventario;
     private javax.swing.JButton btnPedidos;
     private javax.swing.JButton btnProductos;
     private javax.swing.JButton btnRegistrar;
