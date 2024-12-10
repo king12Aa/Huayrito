@@ -5,6 +5,8 @@ import Conexion.Conexion;
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.swing.JOptionPane;
 import javax.swing.table.DefaultTableModel;
 
@@ -15,6 +17,7 @@ public class Cliente extends javax.swing.JFrame {
     
     public Cliente() {
         initComponents();
+        actualizarTablaClientes();
     }
     
     private void actualizarTablaClientes() {
@@ -58,6 +61,33 @@ public class Cliente extends javax.swing.JFrame {
         }
     }
     
+    public static boolean validarNombre(String nombre) {
+        String regex = "^[a-zA-Z\\s]+$";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(nombre);
+        return matcher.matches();
+    }
+
+    public static boolean validarTelefono(String telefono) {
+        String regex = "^\\d{9}$";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(telefono);
+        return matcher.matches();
+    }
+
+    public static boolean validarEmail(String email) {
+        String regex = "^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(email);
+        return matcher.matches();
+    }
+
+    public static boolean validarDireccion(String direccion) {
+        String regex = "^[a-zA-Z0-9\\s,.-]+$";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(direccion);
+        return matcher.matches();
+    }
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -310,6 +340,7 @@ public class Cliente extends javax.swing.JFrame {
     }//GEN-LAST:event_btnEmpleadosActionPerformed
 
     private void btnRegistrarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRegistrarActionPerformed
+        
         String nombre = txtNombre.getText();
         String telefono = txtTelefono.getText();
         String email = txtCorreo.getText();
@@ -319,7 +350,27 @@ public class Cliente extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos");
             return;
         }
+        
+        if (!validarNombre(nombre)) {
+            JOptionPane.showMessageDialog(this, "El nombre solo puede contener letras y espacios.");
+            return;
+        }
 
+        if (!validarTelefono(telefono)) {
+            JOptionPane.showMessageDialog(this, "El teléfono debe contener 9 dígitos.");
+            return;
+        }
+
+        if (!validarEmail(email)) {
+            JOptionPane.showMessageDialog(this, "El correo electrónico no tiene un formato válido.");
+            return;
+        }
+
+        if (!validarDireccion(direccion)) {
+            JOptionPane.showMessageDialog(this, "La dirección contiene caracteres no válidos.");
+            return;
+        }
+    
         String sql = "INSERT INTO clientes (Nombre, Teléfono, Email, Dirección) VALUES (?, ?, ?, ?)";
 
         try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql)) {
@@ -394,9 +445,20 @@ public class Cliente extends javax.swing.JFrame {
             String telefono = (String) tablaClientes.getValueAt(filaSeleccionada, 2);
             String email = (String) tablaClientes.getValueAt(filaSeleccionada, 3);
 
-            eliminarCliente(nombre, telefono, email);
+            int opcion = JOptionPane.showConfirmDialog(
+                null, 
+                "¿Estás seguro de que deseas eliminar al cliente " + nombre + "?", 
+                "Confirmar eliminación", 
+                JOptionPane.YES_NO_OPTION
+            );
 
-            actualizarTablaClientes();
+            if (opcion == JOptionPane.YES_OPTION) {
+                eliminarCliente(nombre, telefono, email);
+                actualizarTablaClientes();
+                JOptionPane.showMessageDialog(null, "Cliente eliminado exitosamente.");
+            } else {
+                JOptionPane.showMessageDialog(null, "Eliminación cancelada.");
+            }
         }
     }//GEN-LAST:event_btnEliminarActionPerformed
 

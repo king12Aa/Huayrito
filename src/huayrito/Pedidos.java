@@ -4,6 +4,7 @@ package huayrito;
 import Conexion.Conexion;
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
+import com.mysql.jdbc.Statement;
 import java.sql.ResultSet;
 import javax.swing.JOptionPane;
 import javax.swing.table.DefaultTableModel;
@@ -19,6 +20,32 @@ public class Pedidos extends javax.swing.JFrame {
         cargarEmpleados();
         cargarProductos();
         actualizarTabla();
+        actualizarTablaPedidos();
+    }
+    
+    private void actualizarTablaPedidos() {
+        String[] columnas = {"ID", "Cliente", "Empleado", "Fecha de pedido", "Total"};
+        DefaultTableModel modelo = new DefaultTableModel(null, columnas);
+
+        String sql = "SELECT p.ID_Pedido, c.Nombre AS Cliente, e.Nombre AS Empleado, p.Fecha_Pedido, p.Total "
+                   + "FROM pedidos p "
+                   + "JOIN clientes c ON p.ID_Cliente = c.ID_Cliente "
+                   + "JOIN empleados e ON p.ID_Empleado = e.ID_Empleado";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql); ResultSet rs = pst.executeQuery()) {
+            while (rs.next()) {
+                String idPedido = rs.getString("ID_Pedido");
+                String cliente = rs.getString("Cliente");
+                String empleado = rs.getString("Empleado");
+                String fechaPedido = rs.getString("Fecha_Pedido");
+                String total = rs.getString("Total");
+
+                modelo.addRow(new Object[]{idPedido, cliente, empleado, fechaPedido, total});
+            }
+            tablaPedidos.setModel(modelo);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar los datos: " + e.getMessage());
+        }
     }
     
     private void cargarClientes() {
@@ -74,10 +101,10 @@ public class Pedidos extends javax.swing.JFrame {
     
     private void actualizarTabla() {
         DefaultTableModel modelo = (DefaultTableModel) tablaProductos.getModel();
-        modelo.setRowCount(0);  // Limpiar la tabla
+        modelo.setRowCount(0);
 
         try {
-            String sql = "SELECT * FROM detalles_pedido";
+            String sql = "SELECT * FROM detalles_pedido where ID_Pedido is null";
             PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
             ResultSet rs = pst.executeQuery();
 
@@ -178,6 +205,129 @@ public class Pedidos extends javax.swing.JFrame {
         }
     }
     
+    private void registrarPedido() {
+        String clienteSeleccionado = (String) comboCliente.getSelectedItem();
+        String empleadoSeleccionado = (String) comboEmpleado.getSelectedItem();
+        String fechaPedido = txtFechaPedido.getText();
+
+        if (clienteSeleccionado == null || clienteSeleccionado.equals("Seleccione un cliente") || 
+            empleadoSeleccionado == null || empleadoSeleccionado.equals("Seleccione un empleado") || 
+            fechaPedido.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Por favor, seleccione un cliente, un empleado y una fecha.");
+            return;
+        }
+
+
+        int idCliente = obtenerIdCliente(clienteSeleccionado);
+        int idEmpleado = obtenerIdEmpleado(empleadoSeleccionado);
+
+        double total = 0.0;
+        try {
+            String sql = "SELECT Subtotal FROM detalles_pedido WHERE ID_Pedido IS NULL";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            ResultSet rs = pst.executeQuery();
+
+            while (rs.next()) {
+                total += rs.getDouble("Subtotal");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al calcular el total: " + e.getMessage());
+        }
+
+        try {
+            String sql = "INSERT INTO pedidos (Fecha_Pedido, Total, ID_Cliente, ID_Empleado) VALUES (?, ?, ?, ?)";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            pst.setString(1, fechaPedido);
+            pst.setDouble(2, total);
+            pst.setInt(3, idCliente);
+            pst.setInt(4, idEmpleado);
+            int filasAfectadas = pst.executeUpdate();
+
+            if (filasAfectadas > 0) {
+                // Obtener el ID_Pedido generado
+                ResultSet rs = pst.getGeneratedKeys();
+                if (rs.next()) {
+                    int idPedido = rs.getInt(1);
+
+                    actualizarDetallesPedido(idPedido);
+
+                    JOptionPane.showMessageDialog(this, "Pedido registrado correctamente.");
+                }
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al registrar el pedido: " + e.getMessage());
+        }
+    }
+
+    private int obtenerIdCliente(String nombreCliente) {
+        int idCliente = -1;
+        try {
+            String sql = "SELECT ID_Cliente FROM clientes WHERE Nombre = ?";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            pst.setString(1, nombreCliente);
+            ResultSet rs = pst.executeQuery();
+
+            if (rs.next()) {
+                idCliente = rs.getInt("ID_Cliente");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al obtener el ID del cliente: " + e.getMessage());
+        }
+        return idCliente;
+    }
+
+    private int obtenerIdEmpleado(String nombreEmpleado) {
+        int idEmpleado = -1;
+        try {
+            String sql = "SELECT ID_Empleado FROM empleados WHERE Nombre = ?";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            pst.setString(1, nombreEmpleado);
+            ResultSet rs = pst.executeQuery();
+
+            if (rs.next()) {
+                idEmpleado = rs.getInt("ID_Empleado");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al obtener el ID del empleado: " + e.getMessage());
+        }
+        return idEmpleado;
+    }
+
+    private void actualizarDetallesPedido(int idPedido) {
+        try {
+            String sql = "UPDATE detalles_pedido SET ID_Pedido = ? WHERE ID_Pedido IS NULL";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            pst.setInt(1, idPedido);
+            pst.executeUpdate();
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al actualizar los detalles del pedido: " + e.getMessage());
+        }
+    }
+    
+    public void eliminarPedido(int idPedido) {
+        try {
+            String sqlDetalles = "DELETE FROM detalles_pedido WHERE ID_Pedido = ?";
+            try (PreparedStatement p1 = (PreparedStatement) cn.prepareStatement(sqlDetalles)) {
+                p1.setInt(1, idPedido);
+                p1.executeUpdate();
+            }
+
+            String sqlPedido = "DELETE FROM pedidos WHERE ID_Pedido = ?";
+            try (PreparedStatement p2 = (PreparedStatement) cn.prepareStatement(sqlPedido)) {
+                p2.setInt(1, idPedido);
+                int filasAfectadas = p2.executeUpdate();
+                if (filasAfectadas > 0) {
+                    JOptionPane.showMessageDialog(null, "Pedido eliminado correctamente");
+                } else {
+                    JOptionPane.showMessageDialog(null, "No se encontró el pedido para eliminar");
+                }
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Error al eliminar el pedido: " + e.getMessage());
+            System.out.println(e);
+        }
+    }
+    
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -197,9 +347,8 @@ public class Pedidos extends javax.swing.JFrame {
         jLabel13 = new javax.swing.JLabel();
         jLabel7 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
-        btnEditar = new javax.swing.JButton();
         jScrollPane1 = new javax.swing.JScrollPane();
-        tablaReservas = new javax.swing.JTable();
+        tablaPedidos = new javax.swing.JTable();
         btnEliminar = new javax.swing.JButton();
         btnEliminarProducto = new javax.swing.JButton();
         comboEmpleado = new javax.swing.JComboBox<>();
@@ -306,12 +455,7 @@ public class Pedidos extends javax.swing.JFrame {
         jLabel5.setText("Lista de Pedidos:");
         jPanel1.add(jLabel5, new org.netbeans.lib.awtextra.AbsoluteConstraints(40, 390, -1, -1));
 
-        btnEditar.setBackground(new java.awt.Color(255, 153, 51));
-        btnEditar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
-        btnEditar.setText("Editar");
-        jPanel1.add(btnEditar, new org.netbeans.lib.awtextra.AbsoluteConstraints(130, 450, 250, -1));
-
-        tablaReservas.setModel(new javax.swing.table.DefaultTableModel(
+        tablaPedidos.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
             },
@@ -327,14 +471,19 @@ public class Pedidos extends javax.swing.JFrame {
                 return types [columnIndex];
             }
         });
-        jScrollPane1.setViewportView(tablaReservas);
+        jScrollPane1.setViewportView(tablaPedidos);
 
         jPanel1.add(jScrollPane1, new org.netbeans.lib.awtextra.AbsoluteConstraints(30, 510, 850, 250));
 
         btnEliminar.setBackground(new java.awt.Color(255, 153, 51));
         btnEliminar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnEliminar.setText("Eliminar");
-        jPanel1.add(btnEliminar, new org.netbeans.lib.awtextra.AbsoluteConstraints(470, 450, 250, -1));
+        btnEliminar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEliminarActionPerformed(evt);
+            }
+        });
+        jPanel1.add(btnEliminar, new org.netbeans.lib.awtextra.AbsoluteConstraints(310, 450, 250, -1));
 
         btnEliminarProducto.setBackground(new java.awt.Color(255, 153, 51));
         btnEliminarProducto.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
@@ -364,6 +513,11 @@ public class Pedidos extends javax.swing.JFrame {
         btnRegistrar.setBackground(new java.awt.Color(255, 153, 51));
         btnRegistrar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnRegistrar.setText("Registrar");
+        btnRegistrar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnRegistrarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnRegistrar, new org.netbeans.lib.awtextra.AbsoluteConstraints(310, 330, 250, -1));
 
         tablaProductos.setModel(new javax.swing.table.DefaultTableModel(
@@ -467,13 +621,13 @@ public class Pedidos extends javax.swing.JFrame {
         String productoSeleccionado = (String) comboProducto.getSelectedItem();
         String cantidadStr = txtCantidad.getText();
 
-        // Validar que se haya seleccionado un producto y se haya ingresado una cantidad
         if (productoSeleccionado == null || productoSeleccionado.equals("Seleccione un producto") || cantidadStr.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Por favor, seleccione un producto y una cantidad.");
             return;
         }
 
         int cantidad;
+        
         try {
             cantidad = Integer.parseInt(cantidadStr);
             if (cantidad <= 0) {
@@ -485,12 +639,10 @@ public class Pedidos extends javax.swing.JFrame {
             return;
         }
 
-        // Obtener el ID del producto y el precio
         int idProducto = obtenerIdProducto(productoSeleccionado);
         double precio = obtenerPrecioProducto(idProducto);
         double subtotal = precio * cantidad;
 
-        // Agregar a la tabla
         DefaultTableModel modelo = (DefaultTableModel) tablaProductos.getModel();
         modelo.addRow(new Object[]{productoSeleccionado, cantidad, precio, subtotal});
 
@@ -512,10 +664,74 @@ public class Pedidos extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_btnEliminarProductoActionPerformed
 
+    private void btnRegistrarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRegistrarActionPerformed
+        String clienteSeleccionado = (String) comboCliente.getSelectedItem();
+        String empleadoSeleccionado = (String) comboEmpleado.getSelectedItem();
+        String fechaPedido = txtFechaPedido.getText();
+
+        if (clienteSeleccionado == null || clienteSeleccionado.equals("Seleccione un cliente") || 
+            empleadoSeleccionado == null || empleadoSeleccionado.equals("Seleccione un empleado") || 
+            fechaPedido.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Por favor, seleccione un cliente, un empleado y una fecha.");
+            return;
+        }
+
+        int idCliente = obtenerIdCliente(clienteSeleccionado);
+        int idEmpleado = obtenerIdEmpleado(empleadoSeleccionado);
+
+        double total = 0.0;
+        try {
+            String sql = "SELECT Subtotal FROM detalles_pedido WHERE ID_Pedido IS NULL";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            ResultSet rs = pst.executeQuery();
+
+            while (rs.next()) {
+                total += rs.getDouble("Subtotal");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al calcular el total: " + e.getMessage());
+        }
+
+        try {
+            String sql = "INSERT INTO pedidos (Fecha_Pedido, Total, ID_Cliente, ID_Empleado) VALUES (?, ?, ?, ?)";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            pst.setString(1, fechaPedido);
+            pst.setDouble(2, total);
+            pst.setInt(3, idCliente);
+            pst.setInt(4, idEmpleado);
+            int filasAfectadas = pst.executeUpdate();
+
+            if (filasAfectadas > 0) {
+                ResultSet rs = pst.getGeneratedKeys();
+                if (rs.next()) {
+                    int idPedido = rs.getInt(1);
+
+                    actualizarDetallesPedido(idPedido);
+
+                    JOptionPane.showMessageDialog(this, "Pedido registrado correctamente.");
+                }
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al registrar el pedido: " + e.getMessage());
+        }
+    }//GEN-LAST:event_btnRegistrarActionPerformed
+
+    private void btnEliminarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEliminarActionPerformed
+        int filaSeleccionada = tablaPedidos.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione un pedido de la tabla");
+        } else {
+            int idPedido = Integer.parseInt(tablaPedidos.getValueAt(filaSeleccionada, 0).toString());
+
+            eliminarPedido(idPedido);
+
+            actualizarTablaPedidos();
+        }
+    }//GEN-LAST:event_btnEliminarActionPerformed
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnAgregarProducto;
     private javax.swing.JButton btnCliente;
-    private javax.swing.JButton btnEditar;
     private javax.swing.JButton btnEliminar;
     private javax.swing.JButton btnEliminarProducto;
     private javax.swing.JButton btnEmpleados;
@@ -542,8 +758,8 @@ public class Pedidos extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel3;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
+    private javax.swing.JTable tablaPedidos;
     private javax.swing.JTable tablaProductos;
-    private javax.swing.JTable tablaReservas;
     private javax.swing.JTextField txtCantidad;
     private javax.swing.JTextField txtFechaPedido;
     // End of variables declaration//GEN-END:variables

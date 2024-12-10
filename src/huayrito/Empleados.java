@@ -5,6 +5,8 @@ import Conexion.Conexion;
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.swing.JOptionPane;
 import javax.swing.table.DefaultTableModel;
 
@@ -58,6 +60,28 @@ public class Empleados extends javax.swing.JFrame {
         }
     }
     
+    public static boolean validarNombre(String nombre) {
+        String regex = "^[a-zA-Z\\s]+$";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(nombre);
+        return matcher.matches();
+    }
+
+    // Validar que el cargo solo contenga letras y espacios
+    public static boolean validarCargo(String cargo) {
+        String regex = "^[a-zA-Z\\s]+$";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(cargo);
+        return matcher.matches();
+    }
+
+    // Validar que el teléfono contenga exactamente 9 dígitos
+    public static boolean validarTelefono(String telefono) {
+        String regex = "^\\d{9}$";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(telefono);
+        return matcher.matches();
+    }
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -306,7 +330,22 @@ public class Empleados extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos");
             return;
         }
+        
+        if (!validarNombre(nombre)) {
+            JOptionPane.showMessageDialog(this, "El nombre solo puede contener letras y espacios.");
+            return;
+        }
 
+        if (!validarCargo(cargo)) {
+            JOptionPane.showMessageDialog(this, "El cargo solo puede contener letras y espacios.");
+            return;
+        }
+
+        if (!validarTelefono(telefono)) {
+            JOptionPane.showMessageDialog(this, "El teléfono debe contener 9 dígitos.");
+            return;
+        }
+        
         Conexion conexion = new Conexion();
         Connection cn = conexion.ConectarBD();
         
@@ -380,9 +419,20 @@ public class Empleados extends javax.swing.JFrame {
             String cargo = (String) tablaEmpleados.getValueAt(filaSeleccionada, 2);
             String telefono = (String) tablaEmpleados.getValueAt(filaSeleccionada, 3);
 
-            eliminarEmpleado(nombre, cargo, telefono);
+            int opcion = JOptionPane.showConfirmDialog(
+                null, 
+                "¿Estás seguro de que deseas eliminar al empleado " + nombre + "?", 
+                "Confirmar eliminación", 
+                JOptionPane.YES_NO_OPTION
+            );
 
-            actualizarTablaEmpleados();
+            if (opcion == JOptionPane.YES_OPTION) {
+                eliminarEmpleado(nombre, cargo, telefono);
+                actualizarTablaEmpleados();
+                JOptionPane.showMessageDialog(null, "Empleado eliminado exitosamente.");
+            } else {
+                JOptionPane.showMessageDialog(null, "Eliminación cancelada.");
+            }
         }
     }//GEN-LAST:event_btnEliminarActionPerformed
 

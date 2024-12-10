@@ -136,6 +136,15 @@ public class Financiera extends javax.swing.JFrame {
             System.out.println(e);
         }
     }
+    
+    public static boolean validarNumeroPositivo(String numero) {
+        try {
+            double valor = Double.parseDouble(numero);
+            return valor > 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -395,13 +404,14 @@ public class Financiera extends javax.swing.JFrame {
         }
 
         double totalVentas, totalGastos;
-        try {
-            totalVentas = Double.parseDouble(totalVentasStr);
-            totalGastos = Double.parseDouble(totalGastosStr);
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "El total de ventas y gastos deben ser números válidos.");
+        
+        if (!validarNumeroPositivo(totalVentasStr) || !validarNumeroPositivo(totalGastosStr)) {
+            JOptionPane.showMessageDialog(this, "El total de ventas y gastos deben ser números válidos y mayores que cero.");
             return;
         }
+        
+        totalVentas = Double.parseDouble(totalVentasStr);
+        totalGastos = Double.parseDouble(totalGastosStr);
 
         Conexion conexion = new Conexion();
         Connection cn = conexion.ConectarBD();

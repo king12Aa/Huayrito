@@ -136,6 +136,10 @@ public class Productos extends javax.swing.JFrame {
         }
     }
 
+    public static boolean validarNombre(String nombre) {
+        return nombre.matches("[a-zA-ZáéíóúÁÉÍÓÚñÑ]+(?:\\s[a-zA-ZáéíóúÁÉÍÓÚñÑ]+)*");
+    }
+    
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -393,7 +397,24 @@ public class Productos extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos y seleccione una categoría válida.");
             return;
         }
+        
+        if (!validarNombre(nombre)) {
+            JOptionPane.showMessageDialog(this, "El nombre debe contener solo letras.");
+            return;
+        }
 
+        double precioValor;
+        try {
+            precioValor = Double.parseDouble(precio);
+            if (precioValor <= 0) {
+                JOptionPane.showMessageDialog(this, "El precio debe ser un número mayor que cero.");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "El precio debe ser un número válido.");
+            return;
+        }
+    
         int stock;
         try {
             stock = Integer.parseInt(stockStr);
