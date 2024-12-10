@@ -1,12 +1,63 @@
 
 package huayrito;
 
+import Conexion.Conexion;
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
+import java.sql.ResultSet;
+import javax.swing.JOptionPane;
+import javax.swing.table.DefaultTableModel;
+
 public class Empleados extends javax.swing.JFrame {
 
+    Conexion conexion = new Conexion();
+    Connection cn = conexion.ConectarBD();
+    
     public Empleados() {
         initComponents();
+        actualizarTablaEmpleados();
     }
 
+    private void actualizarTablaEmpleados() {
+        String[] columnas = {"ID", "Nombre", "Cargo", "Telefono"};
+        DefaultTableModel modelo = new DefaultTableModel(null, columnas);
+        String sql = "SELECT ID_Empleado, Nombre, Cargo, Teléfono from empleados";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql); ResultSet rs = pst.executeQuery()) {
+            while (rs.next()) {
+                String id = rs.getString("ID_Empleado");
+                String nombre = rs.getString("Nombre");
+                String cargo = rs.getString("Cargo");
+                String telefono = rs.getString("Teléfono");
+                modelo.addRow(new Object[]{id, nombre, cargo, telefono, });
+            }
+            tablaEmpleados.setModel(modelo);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar los datos: " + e.getMessage());
+        }
+    }
+    
+    public void eliminarEmpleado(String nombre, String cargo, String telefono) { 
+        try {
+            String sql = "DELETE FROM empleados WHERE Nombre = ? AND Cargo = ? AND Teléfono = ? LIMIT 1";
+            PreparedStatement p1 = (PreparedStatement) cn.prepareStatement(sql);
+
+            p1.setString(1, nombre);
+            p1.setString(2, cargo);
+            p1.setString(3, telefono);
+
+            int filasAfectadas = p1.executeUpdate();
+            if (filasAfectadas > 0) {
+                JOptionPane.showMessageDialog(null, "Empleado eliminado correctamente");
+            } else {
+                JOptionPane.showMessageDialog(null, "No se encontró el empleado para eliminar");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Error al eliminar el empleado: " + e.getMessage());
+            System.out.println(e);
+        }
+    }
+    
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -34,7 +85,7 @@ public class Empleados extends javax.swing.JFrame {
         txtTelefono = new javax.swing.JTextField();
         jLabel12 = new javax.swing.JLabel();
         jScrollPane1 = new javax.swing.JScrollPane();
-        tablaReservas = new javax.swing.JTable();
+        tablaEmpleados = new javax.swing.JTable();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -131,16 +182,31 @@ public class Empleados extends javax.swing.JFrame {
         btnEditar.setBackground(new java.awt.Color(255, 153, 51));
         btnEditar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnEditar.setText("Editar");
+        btnEditar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEditarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnEditar, new org.netbeans.lib.awtextra.AbsoluteConstraints(130, 450, 250, -1));
 
         btnEliminar.setBackground(new java.awt.Color(255, 153, 51));
         btnEliminar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnEliminar.setText("Eliminar");
+        btnEliminar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEliminarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnEliminar, new org.netbeans.lib.awtextra.AbsoluteConstraints(470, 450, 250, -1));
 
         btnRegistrar.setBackground(new java.awt.Color(255, 153, 51));
         btnRegistrar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnRegistrar.setText("Registrar");
+        btnRegistrar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnRegistrarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnRegistrar, new org.netbeans.lib.awtextra.AbsoluteConstraints(310, 330, 250, -1));
         jPanel1.add(txtTelefono, new org.netbeans.lib.awtextra.AbsoluteConstraints(550, 230, 300, 30));
 
@@ -148,7 +214,7 @@ public class Empleados extends javax.swing.JFrame {
         jLabel12.setText("Telefono:");
         jPanel1.add(jLabel12, new org.netbeans.lib.awtextra.AbsoluteConstraints(480, 230, -1, 30));
 
-        tablaReservas.setModel(new javax.swing.table.DefaultTableModel(
+        tablaEmpleados.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
             },
@@ -164,7 +230,12 @@ public class Empleados extends javax.swing.JFrame {
                 return types [columnIndex];
             }
         });
-        jScrollPane1.setViewportView(tablaReservas);
+        tablaEmpleados.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tablaEmpleadosMouseClicked(evt);
+            }
+        });
+        jScrollPane1.setViewportView(tablaEmpleados);
 
         jPanel1.add(jScrollPane1, new org.netbeans.lib.awtextra.AbsoluteConstraints(30, 510, 850, 250));
 
@@ -226,6 +297,110 @@ public class Empleados extends javax.swing.JFrame {
         this.dispose();
     }//GEN-LAST:event_btnEmpleadosActionPerformed
 
+    private void btnRegistrarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRegistrarActionPerformed
+        String nombre = txtNombre.getText();
+        String cargo = txtCargo.getText();
+        String telefono = txtTelefono.getText();
+
+        if (nombre.isEmpty() || cargo.isEmpty() || telefono.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos");
+            return;
+        }
+
+        Conexion conexion = new Conexion();
+        Connection cn = conexion.ConectarBD();
+        
+        String sql = "INSERT INTO empleados (Nombre, Cargo, Teléfono) VALUES (?, ?, ?)";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql)) {
+            pst.setString(1, nombre);
+            pst.setString(2, cargo);
+            pst.setString(3, telefono);
+
+            int resultado = pst.executeUpdate();
+
+            if (resultado > 0) {
+                JOptionPane.showMessageDialog(this, "Empleado registrado exitosamente.");
+                txtNombre.setText("");
+                txtCargo.setText("");
+                txtTelefono.setText("");
+                actualizarTablaEmpleados();
+            } else {
+                JOptionPane.showMessageDialog(this, "Error al registrar empleado.");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        }
+    }//GEN-LAST:event_btnRegistrarActionPerformed
+
+    private void btnEditarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEditarActionPerformed
+        String nombre = txtNombre.getText();
+        String cargo = txtCargo.getText();
+        String telefono = txtTelefono.getText();
+
+        if (nombre.isEmpty() || cargo.isEmpty() || telefono.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos");
+            return;
+        }
+
+        int row = tablaEmpleados.getSelectedRow();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Seleccione un empleado para editar.");
+            return;
+        }
+
+        String id = tablaEmpleados.getValueAt(row, 0).toString();
+
+        String sql = "UPDATE empleados SET Nombre = ?, Cargo = ?, Teléfono = ? WHERE ID_Empleado = ?";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql)) {
+            pst.setString(1, nombre);
+            pst.setString(2, cargo);
+            pst.setString(3, telefono);
+            pst.setString(4, id);
+
+            int rowsAffected = pst.executeUpdate();
+            if (rowsAffected > 0) {
+                JOptionPane.showMessageDialog(this, "Empleado actualizado con éxito.");
+                actualizarTablaEmpleados();
+            } else {
+                JOptionPane.showMessageDialog(this, "Error al actualizar el empleado.");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al editar el empleado: " + e.getMessage());
+        }
+    }//GEN-LAST:event_btnEditarActionPerformed
+
+    private void btnEliminarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEliminarActionPerformed
+        int filaSeleccionada = tablaEmpleados.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione un empleado de la tabla");
+        } else {
+            String nombre = (String) tablaEmpleados.getValueAt(filaSeleccionada, 1);
+            String cargo = (String) tablaEmpleados.getValueAt(filaSeleccionada, 2);
+            String telefono = (String) tablaEmpleados.getValueAt(filaSeleccionada, 3);
+
+            eliminarEmpleado(nombre, cargo, telefono);
+
+            actualizarTablaEmpleados();
+        }
+    }//GEN-LAST:event_btnEliminarActionPerformed
+
+    private void tablaEmpleadosMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tablaEmpleadosMouseClicked
+        int filaSeleccionada = tablaEmpleados.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione un empleado de la tabla");
+        } else {
+            String nombre = (String) tablaEmpleados.getValueAt(filaSeleccionada, 1);
+            String cargo = (String) tablaEmpleados.getValueAt(filaSeleccionada, 2);
+            String telefono = (String) tablaEmpleados.getValueAt(filaSeleccionada, 3);
+
+            txtNombre.setText(nombre);
+            txtCargo.setText(cargo);
+            txtTelefono.setText(telefono);
+        }
+    }//GEN-LAST:event_tablaEmpleadosMouseClicked
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnCliente;
     private javax.swing.JButton btnEditar;
@@ -247,7 +422,7 @@ public class Empleados extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JScrollPane jScrollPane1;
-    private javax.swing.JTable tablaReservas;
+    private javax.swing.JTable tablaEmpleados;
     private javax.swing.JTextField txtCargo;
     private javax.swing.JTextField txtNombre;
     private javax.swing.JTextField txtTelefono;

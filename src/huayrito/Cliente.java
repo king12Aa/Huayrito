@@ -1,12 +1,63 @@
 
 package huayrito;
 
-public class Cliente extends javax.swing.JFrame {
+import Conexion.Conexion;
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
+import java.sql.ResultSet;
+import javax.swing.JOptionPane;
+import javax.swing.table.DefaultTableModel;
 
+public class Cliente extends javax.swing.JFrame {
+    
+    Conexion conexion = new Conexion();
+    Connection cn = conexion.ConectarBD();
+    
     public Cliente() {
         initComponents();
     }
-   
+    
+    private void actualizarTablaClientes() {
+        String[] columnas = {"ID", "Nombre", "Teléfono", "Email", "Dirección"};
+        DefaultTableModel modelo = new DefaultTableModel(null, columnas);
+        String sql = "SELECT ID_Cliente, Nombre, Teléfono, Email, Dirección from clientes";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql); ResultSet rs = pst.executeQuery()) {
+            while (rs.next()) {
+                String id = rs.getString("ID_Cliente");
+                String nombre = rs.getString("Nombre");
+                String telefono = rs.getString("Teléfono");
+                String email = rs.getString("Email");
+                String direccion = rs.getString("Dirección");
+                modelo.addRow(new Object[]{id, nombre, telefono, email, direccion});
+            }
+            tablaClientes.setModel(modelo);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar los datos: " + e.getMessage());
+        }
+    }
+    
+    public void eliminarCliente(String nombre, String telefono, String email) { 
+        try {
+            String sql = "DELETE FROM clientes WHERE Nombre = ? AND Teléfono = ? AND Email = ? LIMIT 1";
+            PreparedStatement p1 = (PreparedStatement) cn.prepareStatement(sql);
+
+            p1.setString(1, nombre);
+            p1.setString(2, telefono);
+            p1.setString(3, email);
+
+            int filasAfectadas = p1.executeUpdate();
+            if (filasAfectadas > 0) {
+                JOptionPane.showMessageDialog(null, "Cliente eliminado correctamente");
+            } else {
+                JOptionPane.showMessageDialog(null, "No se encontró el cliente para eliminar");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Error al eliminar el cliente: " + e.getMessage());
+            System.out.println(e);
+        }
+    }
+    
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -28,7 +79,7 @@ public class Cliente extends javax.swing.JFrame {
         jLabel5 = new javax.swing.JLabel();
         btnEditar = new javax.swing.JButton();
         jScrollPane1 = new javax.swing.JScrollPane();
-        tablaReservas = new javax.swing.JTable();
+        tablaClientes = new javax.swing.JTable();
         btnEliminar = new javax.swing.JButton();
         btnRegistrar = new javax.swing.JButton();
         jLabel14 = new javax.swing.JLabel();
@@ -132,9 +183,14 @@ public class Cliente extends javax.swing.JFrame {
         btnEditar.setBackground(new java.awt.Color(255, 153, 51));
         btnEditar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnEditar.setText("Editar");
+        btnEditar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEditarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnEditar, new org.netbeans.lib.awtextra.AbsoluteConstraints(130, 450, 250, -1));
 
-        tablaReservas.setModel(new javax.swing.table.DefaultTableModel(
+        tablaClientes.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
             },
@@ -150,18 +206,33 @@ public class Cliente extends javax.swing.JFrame {
                 return types [columnIndex];
             }
         });
-        jScrollPane1.setViewportView(tablaReservas);
+        tablaClientes.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tablaClientesMouseClicked(evt);
+            }
+        });
+        jScrollPane1.setViewportView(tablaClientes);
 
         jPanel1.add(jScrollPane1, new org.netbeans.lib.awtextra.AbsoluteConstraints(30, 510, 850, 250));
 
         btnEliminar.setBackground(new java.awt.Color(255, 153, 51));
         btnEliminar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnEliminar.setText("Eliminar");
+        btnEliminar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEliminarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnEliminar, new org.netbeans.lib.awtextra.AbsoluteConstraints(470, 450, 250, -1));
 
         btnRegistrar.setBackground(new java.awt.Color(255, 153, 51));
         btnRegistrar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnRegistrar.setText("Registrar");
+        btnRegistrar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnRegistrarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnRegistrar, new org.netbeans.lib.awtextra.AbsoluteConstraints(310, 330, 250, -1));
 
         jLabel14.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
@@ -238,6 +309,114 @@ public class Cliente extends javax.swing.JFrame {
         this.dispose();
     }//GEN-LAST:event_btnEmpleadosActionPerformed
 
+    private void btnRegistrarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRegistrarActionPerformed
+        String nombre = txtNombre.getText();
+        String telefono = txtTelefono.getText();
+        String email = txtCorreo.getText();
+        String direccion = txtDireccion.getText();
+
+        if (nombre.isEmpty() || telefono.isEmpty() || email.isEmpty() || direccion.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos");
+            return;
+        }
+
+        String sql = "INSERT INTO clientes (Nombre, Teléfono, Email, Dirección) VALUES (?, ?, ?, ?)";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql)) {
+            pst.setString(1, nombre);
+            pst.setString(2, telefono);
+            pst.setString(3, email);
+            pst.setString(4, direccion);
+
+            int resultado = pst.executeUpdate();
+
+            if (resultado > 0) {
+                JOptionPane.showMessageDialog(this, "Cliente registrado exitosamente.");
+                txtNombre.setText("");
+                txtTelefono.setText("");
+                txtCorreo.setText("");
+                txtDireccion.setText("");
+                actualizarTablaClientes();
+            } else {
+                JOptionPane.showMessageDialog(this, "Error al registrar cliente.");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        }
+    }//GEN-LAST:event_btnRegistrarActionPerformed
+
+    private void btnEditarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEditarActionPerformed
+        String nombre = txtNombre.getText();
+        String telefono = txtTelefono.getText();
+        String email = txtCorreo.getText();
+        String direccion = txtDireccion.getText();
+
+        if (nombre.isEmpty() || telefono.isEmpty() || email.isEmpty() || direccion.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos");
+            return;
+        }
+
+        int row = tablaClientes.getSelectedRow();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Seleccione un cliente para editar.");
+            return;
+        }
+
+        String id = tablaClientes.getValueAt(row, 0).toString();
+
+        String sql = "UPDATE clientes SET Nombre = ?, Teléfono = ?, Email = ?, Dirección = ? WHERE ID_Cliente = ?";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql)) {
+            pst.setString(1, nombre);
+            pst.setString(2, telefono);
+            pst.setString(3, email);
+            pst.setString(4, direccion);
+            pst.setString(5, id);
+
+            int rowsAffected = pst.executeUpdate();
+            if (rowsAffected > 0) {
+                JOptionPane.showMessageDialog(this, "Cliente actualizado con éxito.");
+                actualizarTablaClientes();
+            } else {
+                JOptionPane.showMessageDialog(this, "Error al actualizar el cliente.");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al editar el cliente: " + e.getMessage());
+        }
+    }//GEN-LAST:event_btnEditarActionPerformed
+
+    private void btnEliminarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEliminarActionPerformed
+        int filaSeleccionada = tablaClientes.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione un cliente de la tabla");
+        } else {
+            String nombre = (String) tablaClientes.getValueAt(filaSeleccionada, 1);
+            String telefono = (String) tablaClientes.getValueAt(filaSeleccionada, 2);
+            String email = (String) tablaClientes.getValueAt(filaSeleccionada, 3);
+
+            eliminarCliente(nombre, telefono, email);
+
+            actualizarTablaClientes();
+        }
+    }//GEN-LAST:event_btnEliminarActionPerformed
+
+    private void tablaClientesMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tablaClientesMouseClicked
+        int filaSeleccionada = tablaClientes.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione un cliente de la tabla");
+        } else {
+            String nombre = (String) tablaClientes.getValueAt(filaSeleccionada, 1);
+            String telefono = (String) tablaClientes.getValueAt(filaSeleccionada, 2);
+            String email = (String) tablaClientes.getValueAt(filaSeleccionada, 3);
+            String direccion = (String) tablaClientes.getValueAt(filaSeleccionada, 4);
+
+            txtNombre.setText(nombre);
+            txtTelefono.setText(telefono);
+            txtCorreo.setText(email);
+            txtDireccion.setText(direccion);
+        }
+    }//GEN-LAST:event_tablaClientesMouseClicked
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnCliente;
@@ -262,7 +441,7 @@ public class Cliente extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JScrollPane jScrollPane1;
-    private javax.swing.JTable tablaReservas;
+    private javax.swing.JTable tablaClientes;
     private javax.swing.JTextField txtCorreo;
     private javax.swing.JTextField txtDireccion;
     private javax.swing.JTextField txtNombre;

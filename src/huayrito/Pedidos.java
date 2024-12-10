@@ -1,12 +1,183 @@
 
 package huayrito;
 
+import Conexion.Conexion;
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
+import java.sql.ResultSet;
+import javax.swing.JOptionPane;
+import javax.swing.table.DefaultTableModel;
+
 public class Pedidos extends javax.swing.JFrame {
 
+    Conexion conexion = new Conexion();
+    Connection cn = conexion.ConectarBD();
+    
     public Pedidos() {
         initComponents();
+        cargarClientes();
+        cargarEmpleados();
+        cargarProductos();
+        actualizarTabla();
     }
+    
+    private void cargarClientes() {
+        String sql = "SELECT Nombre FROM clientes";
+        
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+             ResultSet rs = pst.executeQuery()) {
 
+            comboCliente.removeAllItems();
+            comboCliente.addItem("Seleccione un cliente");
+
+            while (rs.next()) {
+                comboCliente.addItem(rs.getString("Nombre"));
+            }
+        } catch (Exception e) {
+            System.out.println("Error al llenar el combo: " + e);
+        }
+    }
+    
+    private void cargarEmpleados() {
+        String sql = "SELECT Nombre FROM empleados";
+        
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+             ResultSet rs = pst.executeQuery()) {
+
+            comboEmpleado.removeAllItems();
+            comboEmpleado.addItem("Seleccione un empleado");
+
+            while (rs.next()) {
+                comboEmpleado.addItem(rs.getString("Nombre"));
+            }
+        } catch (Exception e) {
+            System.out.println("Error al llenar el combo: " + e);
+        }
+    }
+    
+    private void cargarProductos() {
+        String sql = "SELECT Nombre_Producto FROM productos";
+        
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+             ResultSet rs = pst.executeQuery()) {
+
+            comboProducto.removeAllItems();
+            comboProducto.addItem("Seleccione un producto");
+
+            while (rs.next()) {
+                comboProducto.addItem(rs.getString("Nombre_Producto"));
+            }
+        } catch (Exception e) {
+            System.out.println("Error al llenar el combo: " + e);
+        }
+    }
+    
+    private void actualizarTabla() {
+        DefaultTableModel modelo = (DefaultTableModel) tablaProductos.getModel();
+        modelo.setRowCount(0);  // Limpiar la tabla
+
+        try {
+            String sql = "SELECT * FROM detalles_pedido";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            ResultSet rs = pst.executeQuery();
+
+            while (rs.next()) {
+                int idProducto = rs.getInt("ID_Producto");
+                String nombreProducto = obtenerNombreProducto(idProducto);
+                int cantidad = rs.getInt("Cantidad");
+                double precio = obtenerPrecioProducto(idProducto);
+                double subtotal = rs.getDouble("Subtotal");
+
+                modelo.addRow(new Object[]{nombreProducto, cantidad, precio, subtotal});
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al actualizar la tabla: " + e.getMessage());
+        }
+    }
+    
+    private String obtenerNombreProducto(int idProducto) {
+        String nombreProducto = "";
+        try {
+            String sql = "SELECT Nombre_Producto FROM productos WHERE ID_Producto = ?";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            pst.setInt(1, idProducto);
+            ResultSet rs = pst.executeQuery();
+
+            if (rs.next()) {
+                nombreProducto = rs.getString("Nombre_Producto");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al obtener el nombre del producto: " + e.getMessage());
+        }
+        return nombreProducto;
+    }
+    
+    private double obtenerPrecioProducto(int idProducto) {
+        double precio = 0.0;
+        try {
+            String sql = "SELECT Precio FROM productos WHERE ID_Producto = ?";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            pst.setInt(1, idProducto);
+            ResultSet rs = pst.executeQuery();
+
+            if (rs.next()) {
+                precio = rs.getDouble("Precio");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al obtener el precio del producto: " + e.getMessage());
+        }
+        return precio;
+    }
+    
+    private int obtenerIdProducto(String nombreProducto) {
+        int idProducto = -1;
+        try {
+            String sql = "SELECT ID_Producto FROM productos WHERE Nombre_Producto = ?";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            pst.setString(1, nombreProducto);
+            ResultSet rs = pst.executeQuery();
+
+            if (rs.next()) {
+                idProducto = rs.getInt("ID_Producto");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al obtener el ID del producto: " + e.getMessage());
+        }
+        return idProducto;
+    }
+    
+    private void agregarProductoABD(int idProducto, int cantidad, double subtotal) {
+        try {
+            String sql = "INSERT INTO detalles_pedido (ID_Producto, Cantidad, Subtotal) VALUES (?, ?, ?)";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            pst.setInt(1, idProducto);
+            pst.setInt(2, cantidad);
+            pst.setDouble(3, subtotal);
+
+            int filasAfectadas = pst.executeUpdate();
+            if (filasAfectadas > 0) {
+                JOptionPane.showMessageDialog(this, "Producto agregado al pedido correctamente.");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al agregar producto a la base de datos: " + e.getMessage());
+        }
+    }
+    
+    private void eliminarProductoDeABD(int idProducto) {
+        try {
+            String sql = "DELETE FROM detalles_pedido WHERE ID_Producto = ?";
+            PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+            pst.setInt(1, idProducto);
+
+            int filasAfectadas = pst.executeUpdate();
+            if (filasAfectadas > 0) {
+                JOptionPane.showMessageDialog(this, "Producto eliminado correctamente.");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al eliminar producto de la base de datos: " + e.getMessage());
+        }
+    }
+    
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -30,7 +201,7 @@ public class Pedidos extends javax.swing.JFrame {
         jScrollPane1 = new javax.swing.JScrollPane();
         tablaReservas = new javax.swing.JTable();
         btnEliminar = new javax.swing.JButton();
-        btnAgregar = new javax.swing.JButton();
+        btnEliminarProducto = new javax.swing.JButton();
         comboEmpleado = new javax.swing.JComboBox<>();
         comboProducto = new javax.swing.JComboBox<>();
         txtCantidad = new javax.swing.JTextField();
@@ -43,6 +214,7 @@ public class Pedidos extends javax.swing.JFrame {
         jLabel12 = new javax.swing.JLabel();
         jLabel14 = new javax.swing.JLabel();
         txtFechaPedido = new javax.swing.JTextField();
+        btnAgregarProducto = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -164,14 +336,19 @@ public class Pedidos extends javax.swing.JFrame {
         btnEliminar.setText("Eliminar");
         jPanel1.add(btnEliminar, new org.netbeans.lib.awtextra.AbsoluteConstraints(470, 450, 250, -1));
 
-        btnAgregar.setBackground(new java.awt.Color(255, 153, 51));
-        btnAgregar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
-        btnAgregar.setText("Agregar");
-        jPanel1.add(btnAgregar, new org.netbeans.lib.awtextra.AbsoluteConstraints(790, 150, 100, 40));
+        btnEliminarProducto.setBackground(new java.awt.Color(255, 153, 51));
+        btnEliminarProducto.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
+        btnEliminarProducto.setText("Eliminar");
+        btnEliminarProducto.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEliminarProductoActionPerformed(evt);
+            }
+        });
+        jPanel1.add(btnEliminarProducto, new org.netbeans.lib.awtextra.AbsoluteConstraints(790, 170, 100, 30));
 
         jPanel1.add(comboEmpleado, new org.netbeans.lib.awtextra.AbsoluteConstraints(130, 220, 300, 30));
 
-        jPanel1.add(comboProducto, new org.netbeans.lib.awtextra.AbsoluteConstraints(530, 140, 240, 30));
+        jPanel1.add(comboProducto, new org.netbeans.lib.awtextra.AbsoluteConstraints(530, 130, 240, 30));
         jPanel1.add(txtCantidad, new org.netbeans.lib.awtextra.AbsoluteConstraints(530, 170, 240, 30));
 
         jLabel9.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
@@ -180,7 +357,7 @@ public class Pedidos extends javax.swing.JFrame {
 
         jLabel11.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         jLabel11.setText("Producto:");
-        jPanel1.add(jLabel11, new org.netbeans.lib.awtextra.AbsoluteConstraints(460, 140, -1, 30));
+        jPanel1.add(jLabel11, new org.netbeans.lib.awtextra.AbsoluteConstraints(460, 130, -1, 30));
 
         jPanel1.add(comboCliente, new org.netbeans.lib.awtextra.AbsoluteConstraints(130, 180, 300, 30));
 
@@ -194,11 +371,11 @@ public class Pedidos extends javax.swing.JFrame {
 
             },
             new String [] {
-                "Nombre_Producto", "Cantidad"
+                "Nombre_Producto", "Cantidad", "Precio", "Subtotal"
             }
         ) {
             Class[] types = new Class [] {
-                java.lang.String.class, java.lang.String.class
+                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
             };
 
             public Class getColumnClass(int columnIndex) {
@@ -207,7 +384,7 @@ public class Pedidos extends javax.swing.JFrame {
         });
         jScrollPane2.setViewportView(tablaProductos);
 
-        jPanel1.add(jScrollPane2, new org.netbeans.lib.awtextra.AbsoluteConstraints(500, 210, 340, 90));
+        jPanel1.add(jScrollPane2, new org.netbeans.lib.awtextra.AbsoluteConstraints(500, 220, 340, 90));
 
         jLabel12.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         jLabel12.setText("Fecha de");
@@ -217,6 +394,16 @@ public class Pedidos extends javax.swing.JFrame {
         jLabel14.setText("Pedido:");
         jPanel1.add(jLabel14, new org.netbeans.lib.awtextra.AbsoluteConstraints(60, 270, -1, 30));
         jPanel1.add(txtFechaPedido, new org.netbeans.lib.awtextra.AbsoluteConstraints(130, 260, 300, 30));
+
+        btnAgregarProducto.setBackground(new java.awt.Color(255, 153, 51));
+        btnAgregarProducto.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
+        btnAgregarProducto.setText("Agregar");
+        btnAgregarProducto.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnAgregarProductoActionPerformed(evt);
+            }
+        });
+        jPanel1.add(btnAgregarProducto, new org.netbeans.lib.awtextra.AbsoluteConstraints(790, 130, 100, 30));
 
         jPanel2.add(jPanel1, new org.netbeans.lib.awtextra.AbsoluteConstraints(320, 0, 920, 800));
 
@@ -276,11 +463,61 @@ public class Pedidos extends javax.swing.JFrame {
         this.dispose();
     }//GEN-LAST:event_btnEmpleadosActionPerformed
 
+    private void btnAgregarProductoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnAgregarProductoActionPerformed
+        String productoSeleccionado = (String) comboProducto.getSelectedItem();
+        String cantidadStr = txtCantidad.getText();
+
+        // Validar que se haya seleccionado un producto y se haya ingresado una cantidad
+        if (productoSeleccionado == null || productoSeleccionado.equals("Seleccione un producto") || cantidadStr.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Por favor, seleccione un producto y una cantidad.");
+            return;
+        }
+
+        int cantidad;
+        try {
+            cantidad = Integer.parseInt(cantidadStr);
+            if (cantidad <= 0) {
+                JOptionPane.showMessageDialog(this, "La cantidad debe ser mayor que cero.");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "La cantidad debe ser un número válido.");
+            return;
+        }
+
+        // Obtener el ID del producto y el precio
+        int idProducto = obtenerIdProducto(productoSeleccionado);
+        double precio = obtenerPrecioProducto(idProducto);
+        double subtotal = precio * cantidad;
+
+        // Agregar a la tabla
+        DefaultTableModel modelo = (DefaultTableModel) tablaProductos.getModel();
+        modelo.addRow(new Object[]{productoSeleccionado, cantidad, precio, subtotal});
+
+        agregarProductoABD(idProducto, cantidad, subtotal);
+    }//GEN-LAST:event_btnAgregarProductoActionPerformed
+
+    private void btnEliminarProductoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEliminarProductoActionPerformed
+        int filaSeleccionada = tablaProductos.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione un producto de la tabla.");
+        } else {
+            String nombreProducto = (String) tablaProductos.getValueAt(filaSeleccionada, 0);
+            int idProducto = obtenerIdProducto(nombreProducto);
+
+            DefaultTableModel modelo = (DefaultTableModel) tablaProductos.getModel();
+            modelo.removeRow(filaSeleccionada);
+
+            eliminarProductoDeABD(idProducto);
+        }
+    }//GEN-LAST:event_btnEliminarProductoActionPerformed
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JButton btnAgregar;
+    private javax.swing.JButton btnAgregarProducto;
     private javax.swing.JButton btnCliente;
     private javax.swing.JButton btnEditar;
     private javax.swing.JButton btnEliminar;
+    private javax.swing.JButton btnEliminarProducto;
     private javax.swing.JButton btnEmpleados;
     private javax.swing.JButton btnFinanciera;
     private javax.swing.JButton btnPedidos;

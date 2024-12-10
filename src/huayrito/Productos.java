@@ -1,10 +1,139 @@
 
 package huayrito;
 
-public class Productos extends javax.swing.JFrame {
+import Conexion.Conexion;
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
+import java.sql.ResultSet;
+import javax.swing.JOptionPane;
+import javax.swing.table.DefaultTableModel;
 
+public class Productos extends javax.swing.JFrame {
+    
+    Conexion conexion = new Conexion();
+    Connection cn = conexion.ConectarBD();
+    
     public Productos() {
         initComponents();
+        cargarCategorias();
+        actualizarTablaProductos();
+    }
+    
+    private void cargarCategorias() {
+        String sql = "SELECT Nombre_Categoria FROM categorías";
+        
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+             ResultSet rs = pst.executeQuery()) {
+
+            comboCategoria.removeAllItems();
+            comboCategoria.addItem("Seleccione una categoría");
+
+            while (rs.next()) {
+                comboCategoria.addItem(rs.getString("Nombre_Categoria"));
+            }
+        } catch (Exception e) {
+            System.out.println("Error al llenar el combo: " + e);
+        }
+    }
+    
+    private int obtenerIdCategoria(String categoria, Connection cn) {
+        String sql = "SELECT ID_Categoria FROM categorías WHERE Nombre_Categoria = ?";
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql)) {
+            pst.setString(1, categoria);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("ID_Categoria");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al obtener ID de la categoría: " + e.getMessage());
+        }
+        return -1;
+    }
+    
+    private void actualizarTablaProductos() {
+        String[] columnas = {"ID", "Nombre", "Precio", "Stock", "Categoría"};
+        DefaultTableModel modelo = new DefaultTableModel(null, columnas);
+        String sql = "SELECT p.ID_Producto, p.Nombre_Producto, p.Precio, p.Stock, c.Nombre_Categoria "
+                   + "FROM productos p JOIN categorías c ON p.ID_Categoria = c.ID_Categoria";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql); ResultSet rs = pst.executeQuery()) {
+            while (rs.next()) {
+                String id = rs.getString("ID_Producto");
+                String nombre = rs.getString("Nombre_Producto");
+                String precio = rs.getString("Precio");
+                String stock = rs.getString("Stock");
+                String categoria = rs.getString("Nombre_Categoria");
+                modelo.addRow(new Object[]{id, nombre, precio, stock, categoria});
+            }
+            tablaProductos.setModel(modelo);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar los datos: " + e.getMessage());
+        }
+    }
+    
+    public void editarProducto(String nombreNuevo, double precioNuevo, int stockNuevo, String categoriaNueva,
+                           String nombreActual, double precioActual, int stockActual, String categoriaActual) {
+        try {
+            int idCategoriaNueva = obtenerIdCategoria(categoriaNueva, cn);
+            int idCategoriaActual = obtenerIdCategoria(categoriaActual, cn);
+
+            if (idCategoriaNueva == -1 || idCategoriaActual == -1) {
+                JOptionPane.showMessageDialog(null, "No se pudo obtener el ID de una o más categorías");
+                return;
+            }
+
+            String sql = "UPDATE productos SET Nombre_Producto = ?, Precio = ?, Stock = ?, ID_Categoria = ? " +
+                         "WHERE Nombre_Producto = ? AND Precio = ? AND Stock = ? AND ID_Categoria = ?";
+            PreparedStatement p1 = (PreparedStatement) cn.prepareStatement(sql);
+
+            p1.setString(1, nombreNuevo);
+            p1.setDouble(2, precioNuevo);
+            p1.setInt(3, stockNuevo);
+            p1.setInt(4, idCategoriaNueva);
+
+            p1.setString(5, nombreActual);
+            p1.setDouble(6, precioActual);
+            p1.setInt(7, stockActual);
+            p1.setInt(8, idCategoriaActual);
+
+            int filasAfectadas = p1.executeUpdate();
+            if (filasAfectadas > 0) {
+                JOptionPane.showMessageDialog(null, "Producto editado correctamente");
+            } else {
+                JOptionPane.showMessageDialog(null, "No se pudo editar el producto");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Error al editar el producto");
+            System.out.println(e);
+        }
+    }
+    
+    public void eliminarProducto(String nombre, double precio, int stock, String categoria) {
+        try {
+            int idCategoria = obtenerIdCategoria(categoria, cn);
+            if (idCategoria == -1) {
+                JOptionPane.showMessageDialog(null, "No se pudo obtener el ID de la categoría");
+                return;
+            }
+
+            String sql = "DELETE FROM productos WHERE Nombre_Producto = ? AND Precio = ? AND Stock = ? AND ID_Categoria = ? LIMIT 1";
+            PreparedStatement p1 = (PreparedStatement) cn.prepareStatement(sql);
+
+            p1.setString(1, nombre);
+            p1.setDouble(2, precio);
+            p1.setInt(3, stock);
+            p1.setInt(4, idCategoria);
+
+            int filasAfectadas = p1.executeUpdate();
+            if (filasAfectadas > 0) {
+                JOptionPane.showMessageDialog(null, "Producto eliminado correctamente");
+            } else {
+                JOptionPane.showMessageDialog(null, "No se encontró el producto para eliminar");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Error al eliminar el producto: " + e.getMessage());
+            System.out.println(e);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -133,6 +262,11 @@ public class Productos extends javax.swing.JFrame {
         btnEditar.setBackground(new java.awt.Color(255, 153, 51));
         btnEditar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnEditar.setText("Editar");
+        btnEditar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEditarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnEditar, new org.netbeans.lib.awtextra.AbsoluteConstraints(130, 450, 250, -1));
 
         tablaProductos.setModel(new javax.swing.table.DefaultTableModel(
@@ -151,6 +285,11 @@ public class Productos extends javax.swing.JFrame {
                 return types [columnIndex];
             }
         });
+        tablaProductos.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tablaProductosMouseClicked(evt);
+            }
+        });
         jScrollPane1.setViewportView(tablaProductos);
 
         jPanel1.add(jScrollPane1, new org.netbeans.lib.awtextra.AbsoluteConstraints(30, 510, 850, 250));
@@ -158,11 +297,21 @@ public class Productos extends javax.swing.JFrame {
         btnEliminar.setBackground(new java.awt.Color(255, 153, 51));
         btnEliminar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnEliminar.setText("Eliminar");
+        btnEliminar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEliminarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnEliminar, new org.netbeans.lib.awtextra.AbsoluteConstraints(470, 450, 250, -1));
 
         btnRegistrar.setBackground(new java.awt.Color(255, 153, 51));
         btnRegistrar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnRegistrar.setText("Registrar");
+        btnRegistrar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnRegistrarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnRegistrar, new org.netbeans.lib.awtextra.AbsoluteConstraints(310, 330, 250, -1));
 
         jLabel6.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
@@ -233,6 +382,118 @@ public class Productos extends javax.swing.JFrame {
         p1.setLocationRelativeTo(null);
         this.dispose();
     }//GEN-LAST:event_btnFinancieraActionPerformed
+
+    private void btnRegistrarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRegistrarActionPerformed
+        String nombre = txtNombre.getText();
+        String precio = txtPrecio.getText();
+        String stockStr = txtStock.getText();
+        String categoria = (String) comboCategoria.getSelectedItem();
+
+        if (nombre.isEmpty() || precio.isEmpty() || stockStr.isEmpty() || "Seleccione una categoría".equals(categoria)) {
+            JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos y seleccione una categoría válida.");
+            return;
+        }
+
+        int stock;
+        try {
+            stock = Integer.parseInt(stockStr);
+            if (stock < 0) {
+                JOptionPane.showMessageDialog(this, "El stock debe ser un número mayor o igual a cero.");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "El stock debe ser un número válido.");
+            return;
+        }
+
+        Conexion conexion = new Conexion();
+        Connection cn = conexion.ConectarBD();
+        
+        int idCategoria = obtenerIdCategoria(categoria, cn);
+        if (idCategoria == -1) {
+            JOptionPane.showMessageDialog(this, "Error al obtener el ID de la categoría.");
+            return;
+        }
+        
+        String sql = "INSERT INTO productos (Nombre_Producto, Precio, Stock, ID_Categoria) VALUES (?, ?, ?, ?)";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql)) {
+            pst.setString(1, nombre);
+            pst.setDouble(2, Double.parseDouble(precio));
+            pst.setInt(3, stock);
+            pst.setInt(4, idCategoria);
+
+            int resultado = pst.executeUpdate();
+
+            if (resultado > 0) {
+                JOptionPane.showMessageDialog(this, "Producto registrado exitosamente.");
+                txtNombre.setText("");
+                txtPrecio.setText("");
+                txtStock.setText("");
+                comboCategoria.setSelectedIndex(0);
+                actualizarTablaProductos();
+            } else {
+                JOptionPane.showMessageDialog(this, "Error al registrar el producto.");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        }
+    }//GEN-LAST:event_btnRegistrarActionPerformed
+
+    private void btnEditarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEditarActionPerformed
+        int filaSeleccionada = tablaProductos.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione un producto de la tabla");
+        } else {
+            String nombreActual = (String) tablaProductos.getValueAt(filaSeleccionada, 1);
+            double precioActual = Double.parseDouble(tablaProductos.getValueAt(filaSeleccionada, 2).toString());
+            int stockActual = Integer.parseInt(tablaProductos.getValueAt(filaSeleccionada, 3).toString());
+            String categoriaActual = (String) tablaProductos.getValueAt(filaSeleccionada, 4);
+
+            String nombreNuevo = txtNombre.getText();
+            double precioNuevo = Double.parseDouble(txtPrecio.getText());
+            int stockNuevo = Integer.parseInt(txtStock.getText());
+            String categoriaNueva = (String) comboCategoria.getSelectedItem();
+
+            editarProducto(nombreNuevo, precioNuevo, stockNuevo, categoriaNueva, 
+                           nombreActual, precioActual, stockActual, categoriaActual);
+
+            actualizarTablaProductos();
+        }
+    }//GEN-LAST:event_btnEditarActionPerformed
+
+    private void btnEliminarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEliminarActionPerformed
+        int filaSeleccionada = tablaProductos.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione un producto de la tabla");
+        } else {
+            String nombre = (String) tablaProductos.getValueAt(filaSeleccionada, 1);
+            double precio = Double.parseDouble(tablaProductos.getValueAt(filaSeleccionada, 2).toString());
+            int stock = Integer.parseInt(tablaProductos.getValueAt(filaSeleccionada, 3).toString());
+            String categoria = (String) tablaProductos.getValueAt(filaSeleccionada, 4);
+
+            eliminarProducto(nombre, precio, stock, categoria);
+
+            actualizarTablaProductos();
+        }
+    }//GEN-LAST:event_btnEliminarActionPerformed
+
+    private void tablaProductosMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tablaProductosMouseClicked
+        int filaSeleccionada = tablaProductos.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione un producto de la tabla");
+        } else {
+            String nombre = (String) tablaProductos.getValueAt(filaSeleccionada, 1);
+            String precio = tablaProductos.getValueAt(filaSeleccionada, 2).toString();
+            String stock = tablaProductos.getValueAt(filaSeleccionada, 3).toString();
+            String categoria = (String) tablaProductos.getValueAt(filaSeleccionada, 4);
+
+            txtNombre.setText(nombre);
+            txtPrecio.setText(precio);
+            txtStock.setText(stock);
+            comboCategoria.setSelectedItem(categoria);
+        }
+    }//GEN-LAST:event_tablaProductosMouseClicked
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnCliente;

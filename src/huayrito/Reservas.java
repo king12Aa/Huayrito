@@ -1,12 +1,181 @@
 
 package huayrito;
 
+import Conexion.Conexion;
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
+import java.sql.ResultSet;
+import javax.swing.JOptionPane;
+import javax.swing.table.DefaultTableModel;
+
+
 public class Reservas extends javax.swing.JFrame {
+
+    Conexion conexion = new Conexion();
+    Connection cn = conexion.ConectarBD();
 
     public Reservas() {
         initComponents();
+        cargarClientes();
+        cargarMesas();
+        actualizarTablaReservas();
     }
 
+    private void cargarClientes() {
+        String sql = "SELECT Nombre FROM clientes";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+             ResultSet rs = pst.executeQuery()) {
+
+            comboCliente.removeAllItems();
+            comboCliente.addItem("Seleccione un cliente");
+
+            while (rs.next()) {
+                comboCliente.addItem(rs.getString("Nombre"));
+            }
+        } catch (Exception e) {
+            System.out.println("Error al llenar el combo de clientes: " + e);
+        }
+    }
+
+    private void cargarMesas() {
+        String sql = "SELECT ID_Mesa FROM mesas";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+             ResultSet rs = pst.executeQuery()) {
+
+            comboMesa.removeAllItems();
+            comboMesa.addItem("Seleccione una mesa");
+
+            while (rs.next()) {
+                comboMesa.addItem(rs.getString("ID_Mesa"));
+            }
+        } catch (Exception e) {
+            System.out.println("Error al llenar el combo de mesas: " + e);
+        }
+    }
+
+    private int obtenerIdCliente(String cliente, Connection cn) {
+        String sql = "SELECT ID_Cliente FROM clientes WHERE Nombre = ?";
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql)) {
+            pst.setString(1, cliente);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("ID_Cliente");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al obtener ID de cliente: " + e.getMessage());
+        }
+        return -1;
+    }
+    
+    private int obtenerIdMesa(int mesa, Connection cn) {
+        String sql = "SELECT ID_Mesa FROM mesas WHERE ID_Mesa = ?";
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql)) {
+            pst.setInt(1, mesa);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("ID_Mesa");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al obtener ID de mesa: " + e.getMessage());
+        }
+        return -1;
+    }
+
+    private void actualizarTablaReservas() {
+        String[] columnas = {"ID Reserva", "Fecha", "Hora", "Cliente", "Mesa"};
+        DefaultTableModel modelo = new DefaultTableModel(null, columnas);
+        String sql = "SELECT r.ID_Reserva, r.Fecha_Reserva, r.Hora_Reserva, c.Nombre, m.ID_Mesa "
+                   + "FROM reservas r "
+                   + "JOIN clientes c ON r.ID_Cliente = c.ID_Cliente "
+                   + "JOIN mesas m ON r.ID_Mesa = m.ID_Mesa";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql);
+             ResultSet rs = pst.executeQuery()) {
+
+            while (rs.next()) {
+                String id = rs.getString("ID_Reserva");
+                String fecha = rs.getString("Fecha_Reserva");
+                String hora = rs.getString("Hora_Reserva");
+                String cliente = rs.getString("Nombre");
+                String mesa = rs.getString("ID_Mesa");
+                modelo.addRow(new Object[]{id, fecha, hora, cliente, mesa});
+            }
+            tablaReservas.setModel(modelo);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar las reservas: " + e.getMessage());
+        }
+    }
+    
+    public void editarReserva(String fechaNueva, String horaNueva, String clienteNuevo, int mesaNueva, 
+                          String fechaActual, String horaActual, String clienteActual, int mesaActual) {
+        try {
+            int idClienteNuevo = obtenerIdCliente(clienteNuevo, cn);
+            int idClienteActual = obtenerIdCliente(clienteActual, cn);
+            int idMesaNueva = obtenerIdMesa(mesaNueva, cn);
+            int idMesaActual = obtenerIdMesa(mesaActual, cn);
+
+            if (idClienteNuevo == -1 || idMesaNueva == -1 || idClienteActual == -1 || idMesaActual == -1) {
+                JOptionPane.showMessageDialog(null, "No se pudo obtener los IDs de los clientes o mesas.");
+                return;
+            }
+
+            String sql = "UPDATE reservas SET Fecha_Reserva = ?, Hora_Reserva = ?, ID_Cliente = ?, ID_Mesa = ? " +
+                         "WHERE Fecha_Reserva = ? AND Hora_Reserva = ? AND ID_Cliente = ? AND ID_Mesa = ?";
+            PreparedStatement p1 = (PreparedStatement) cn.prepareStatement(sql);
+
+            p1.setString(1, fechaNueva);
+            p1.setString(2, horaNueva);
+            p1.setInt(3, idClienteNuevo);
+            p1.setInt(4, idMesaNueva);
+
+            p1.setString(5, fechaActual);
+            p1.setString(6, horaActual);
+            p1.setInt(7, idClienteActual);
+            p1.setInt(8, idMesaActual);
+
+            int filasAfectadas = p1.executeUpdate();
+            if (filasAfectadas > 0) {
+                JOptionPane.showMessageDialog(null, "Reserva editada correctamente");
+            } else {
+                JOptionPane.showMessageDialog(null, "No se pudo editar la reserva");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Error al editar la reserva: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public void eliminarReserva(String fecha, String hora, String cliente, int mesa) {
+        try {
+            int idCliente = obtenerIdCliente(cliente, cn);
+            int idMesa = obtenerIdMesa(mesa, cn);
+
+            if (idCliente == -1 || idMesa == -1) {
+                JOptionPane.showMessageDialog(null, "No se pudo obtener el ID de cliente o mesa");
+                return;
+            }
+
+            String sql = "DELETE FROM reservas WHERE Fecha_Reserva = ? AND Hora_Reserva = ? AND ID_Cliente = ? AND ID_Mesa = ? LIMIT 1";
+            PreparedStatement p1 = (PreparedStatement) cn.prepareStatement(sql);
+
+            p1.setString(1, fecha);
+            p1.setString(2, hora);
+            p1.setInt(3, idCliente);
+            p1.setInt(4, idMesa);
+
+            int filasAfectadas = p1.executeUpdate();
+            if (filasAfectadas > 0) {
+                JOptionPane.showMessageDialog(null, "Reserva eliminada correctamente");
+            } else {
+                JOptionPane.showMessageDialog(null, "No se pudo eliminar la reserva");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Error al eliminar la reserva: " + e.getMessage());
+        }
+    }
+    
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -131,6 +300,11 @@ public class Reservas extends javax.swing.JFrame {
         btnRegistrar.setBackground(new java.awt.Color(255, 153, 51));
         btnRegistrar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnRegistrar.setText("Registrar");
+        btnRegistrar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnRegistrarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnRegistrar, new org.netbeans.lib.awtextra.AbsoluteConstraints(310, 330, 250, -1));
 
         jLabel9.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
@@ -145,11 +319,21 @@ public class Reservas extends javax.swing.JFrame {
         btnEditar.setBackground(new java.awt.Color(255, 153, 51));
         btnEditar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnEditar.setText("Editar");
+        btnEditar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEditarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnEditar, new org.netbeans.lib.awtextra.AbsoluteConstraints(130, 450, 250, -1));
 
         btnEliminar.setBackground(new java.awt.Color(255, 153, 51));
         btnEliminar.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         btnEliminar.setText("Eliminar");
+        btnEliminar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEliminarActionPerformed(evt);
+            }
+        });
         jPanel1.add(btnEliminar, new org.netbeans.lib.awtextra.AbsoluteConstraints(470, 450, 250, -1));
 
         tablaReservas.setModel(new javax.swing.table.DefaultTableModel(
@@ -166,6 +350,11 @@ public class Reservas extends javax.swing.JFrame {
 
             public Class getColumnClass(int columnIndex) {
                 return types [columnIndex];
+            }
+        });
+        tablaReservas.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tablaReservasMouseClicked(evt);
             }
         });
         jScrollPane1.setViewportView(tablaReservas);
@@ -244,6 +433,108 @@ public class Reservas extends javax.swing.JFrame {
         p1.setLocationRelativeTo(null);
         this.dispose();
     }//GEN-LAST:event_btnEmpleadosActionPerformed
+
+    private void btnRegistrarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRegistrarActionPerformed
+        String fecha = txtFechaReserva.getText();
+        String hora = txtHoraReserva.getText();
+        String cliente = (String) comboCliente.getSelectedItem();
+        int mesa = Integer.parseInt((String) comboMesa.getSelectedItem());
+
+        if (fecha.isEmpty() || hora.isEmpty() || "Seleccione un cliente".equals(cliente) || mesa == -1) {
+            JOptionPane.showMessageDialog(this, "Por favor, complete todos los campos y seleccione una opción válida.");
+            return;
+        }
+
+        int idCliente = obtenerIdCliente(cliente, cn);
+        if (idCliente == -1) {
+            JOptionPane.showMessageDialog(this, "Error al obtener el ID del cliente.");
+            return;
+        }
+
+        int idMesa = obtenerIdMesa(mesa, cn);
+        if (idMesa == -1) {
+            JOptionPane.showMessageDialog(this, "Error al obtener el ID de la mesa.");
+            return;
+        }
+
+        String sql = "INSERT INTO reservas (Fecha_Reserva, Hora_Reserva, ID_Cliente, ID_Mesa) VALUES (?, ?, ?, ?)";
+
+        try (PreparedStatement pst = (PreparedStatement) cn.prepareStatement(sql)) {
+            pst.setString(1, fecha);
+            pst.setString(2, hora);
+            pst.setInt(3, idCliente);
+            pst.setInt(4, idMesa);
+
+            int resultado = pst.executeUpdate();
+
+            if (resultado > 0) {
+                JOptionPane.showMessageDialog(this, "Reserva registrada exitosamente.");
+                txtFechaReserva.setText("");
+                txtHoraReserva.setText("");
+                comboCliente.setSelectedIndex(0);
+                comboMesa.setSelectedIndex(0);
+                actualizarTablaReservas();
+            } else {
+                JOptionPane.showMessageDialog(this, "Error al registrar la reserva.");
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        }
+    }//GEN-LAST:event_btnRegistrarActionPerformed
+
+    private void btnEditarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEditarActionPerformed
+        int filaSeleccionada = tablaReservas.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione una reserva de la tabla");
+        } else {
+            String fechaActual = tablaReservas.getValueAt(filaSeleccionada, 1).toString();
+            String horaActual = tablaReservas.getValueAt(filaSeleccionada, 2).toString();
+            String clienteActual = tablaReservas.getValueAt(filaSeleccionada, 3).toString();
+            int mesaActual = (Integer)tablaReservas.getValueAt(filaSeleccionada, 4);
+            String fechaNueva = txtFechaReserva.getText();
+            String horaNueva = txtHoraReserva.getText();
+            String clienteNuevo = (String) comboCliente.getSelectedItem();
+            int mesaNueva = (Integer) comboMesa.getSelectedItem();
+
+            editarReserva(fechaNueva, horaNueva, clienteNuevo, mesaNueva, 
+                          fechaActual, horaActual, clienteActual, mesaActual);
+
+            actualizarTablaReservas();
+        }
+    }//GEN-LAST:event_btnEditarActionPerformed
+
+    private void btnEliminarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEliminarActionPerformed
+        int filaSeleccionada = tablaReservas.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione una reserva de la tabla");
+        } else {
+            String fecha = tablaReservas.getValueAt(filaSeleccionada, 1).toString();
+            String hora = tablaReservas.getValueAt(filaSeleccionada, 2).toString();
+            String cliente = tablaReservas.getValueAt(filaSeleccionada, 3).toString();
+            String mesa = tablaReservas.getValueAt(filaSeleccionada, 4).toString();
+
+            eliminarReserva(fecha, hora, cliente, Integer.parseInt(mesa));
+
+            actualizarTablaReservas();
+        }
+    }//GEN-LAST:event_btnEliminarActionPerformed
+
+    private void tablaReservasMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tablaReservasMouseClicked
+        int filaSeleccionada = tablaReservas.getSelectedRow();
+        if (filaSeleccionada == -1) {
+            JOptionPane.showMessageDialog(null, "Seleccione una reserva de la tabla");
+        } else {
+            String fecha = tablaReservas.getValueAt(filaSeleccionada, 1).toString();
+            String hora = tablaReservas.getValueAt(filaSeleccionada, 2).toString();
+            String cliente = tablaReservas.getValueAt(filaSeleccionada, 3).toString();
+            String mesa = tablaReservas.getValueAt(filaSeleccionada, 4).toString();
+
+            txtFechaReserva.setText(fecha);
+            txtHoraReserva.setText(hora);
+            comboCliente.setSelectedItem(cliente);
+            comboMesa.setSelectedItem(mesa);
+        }
+    }//GEN-LAST:event_tablaReservasMouseClicked
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnCliente;
